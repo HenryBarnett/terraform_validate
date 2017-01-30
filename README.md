@@ -1,178 +1,96 @@
 # Terraform Validate
 
-Linux: [![Linux Build Status](https://travis-ci.org/elmundio87/terraform_validate.svg?branch=master)](https://travis-ci.org/elmundio87/terraform_validate)
+A python package for testing Terraform's infrastructure as code though user-defined standards.
 
-Windows: [![Windows Build status](https://ci.appveyor.com/api/projects/status/36dwtekc8tvrny24/branch/master?svg=true)](https://ci.appveyor.com/project/elmundio87/terraform-validate/branch/master)
+Uses `pyhcl` to parse Terraform configuration files, allowing users to write custom scripts to test Terraform. 
+By testing Terraform scripts time is saved in validating scripts before running Terraform apply.
 
-A python package that assists in the enforcement of user-defined standards in Terraform.
+## API
 
-The validator uses `pyhcl` to parse Terraform configuration files, then tests the state of the config using custom Assert functions.
+The declarative API allows testing scripts to be developed quickly. Any checks throw an `AssertionError` when
+the values that they are looking for are not found. In some cases these assertions can be suppressed.
+The API is made up of different sections which represent different areas of the Terraform scripts:
 
-## Example Usages
+### Validator
 
-### Check that all AWS EBS volumes are encrypted
+The validator is an entrypoint in to the Terraform scripts, parsing them and allowing basic sections (resources, data
+variables) to be retrieved and then tested.
 
-
+The validator is set up using the following:
 ```
-import terraform_validate
+from terrform_validate import Validator
 
-class TestEncryptionAtRest(unittest.TestCase):
-
-    def setUp(self):
-        # Tell the module where to find your terraform configuration folder
-        self.path = os.path.join(os.path.dirname(os.path.realpath(__file__)),"../terraform")
-        self.v = terraform_validate.Validator(self.path)
-
-    def test_aws_ebs_volume(self):
-        # Assert that all resources of type 'aws_ebs_volume' are encrypted
-        self.v.error_if_property_missing() #Fail any tests if the property does not exist
-        self.v.resources('aws_ebs_volume').property('encrypted').should_equal(True)
-
-    def test_instance_ebs_block_device(self):
-        # Assert that all resources of type 'ebs_block_device' that are inside a 'aws_instance' are encrypted
-        self.v.error_if_property_missing()
-        self.v.resources('aws_instance').property('ebs_block_device').property('encrypted').should_equal(True)
-
-if __name__ == '__main__':
-    suite = unittest.TestLoader().loadTestsFromTestCase(TestEncryptionAtRest)
-    unittest.TextTestRunner(verbosity=0).run(suite)
-
+validator = Validator(os.path.join(self.path, "path/to/terraform/scripts"))
 ```
 
-```
-resource "aws_instance" "foo" {
-  # This would fail the test
-  ebs_block_device{
-    encrypted = false
-  }
-}
+The Validator has three main functions which retrieve different sections of the Terraform scripts:
+- `resources()` - returns anything that starts with `resource`
+- `data()` - returns any data-source starting with `data`
+- `variables()` - returns the variable sections starting with `variable`
 
-resource "aws_ebs_volume" "bar" {
-  # This would fail the test
-  encrypted = false
-}
-```
+### Resources (and Data)
 
-### Check that AWS resources are tagged correctly
+As the most common part of the infrastructure code most of the testing will be related to resources or data and their 
+properties. Getting these is a case of calling `resources()` or `data()` on the `Validator` as such.
 
 ```
-import terraform_validate
+from terrform_validate import Validator
 
-class TestEncryptionAtRest(unittest.TestCase):
+validator = Validator(os.path.join(self.path, "path/to/terraform/scripts"))
+# get resources
+validator.resources()
 
-    def setUp(self):
-        # Tell the module where to find your terraform configuration folder
-        self.path = os.path.join(os.path.dirname(os.path.realpath(__file__)),"../terraform")
-        self.v = terraform_validate.Validator(self.path)
-        
-    def test_aws_ebs_volume(self):
-        # Assert that all resources of type 'aws_instance' and 'aws_ebs_volume' have the correct tags
-        tagged_resources = ["aws_instance","aws_ebs_volume"]
-        required_tags = ["name","version","owner"]
-        self.v.resources(tagged_resources).property('tags').should_have_properties(required_tags)
-
-if __name__ == '__main__':
-    suite = unittest.TestLoader().loadTestsFromTestCase(TestEncryptionAtRest)
-    unittest.TextTestRunner(verbosity=0).run(suite)
+# get data sources
+validator.data()
 ```
 
-## Behaviour functions
+This returns a `TerraformSection`, a class which allows you to find and check types by type name (aws_instance), and id.
+None of these throw an `AssertionError`, if values aren't found. The `TerraformSection` returns a `TerraformTypeList`
+that can be used to validate the types returned. These are as follows:
+```
+# Get aws_instance types by name
+validator.resources().types_by_name('aws_instance')
 
-These affect the results of the Validation functions in a way that may be required for your tests.
+# Get types related to security
+validator.resources().types_like('.*security.*')
 
-### Validator.error_if_property_missing()
+# Get types with a specific id
+validator.resources().types_by_id('bastion_host')
 
-By default, no errors will be raised if a property value is missing on a resource. This changes the behavior of .property() calls to raise an error if a property is not found on a resource.
+# Get types with an id that contains host
+validator.resources().types_id_like('.*host.*')
 
-### Validator.enable_variable_expansion()
+# Get aws_subnet and aws_security_group types
+valiator.resources().types_by_names(['aws_instance', 'aws_security_group'])
 
-By default, variables in property values will not be calculated against their default values. This changes the behaviour of all Validation functions, to work out the value of a string when the variables have default values.
+# Get all types
+validator.resources().all_types()
+```
 
-eg. `string = "${var.foo}"` will be read as `string = "1"` by the validator if the default value of `foo` is 1.
+You can assert that a section has certain types:
+```
+# make sure that there is data from an archive file
+validator.data().has_type('archive_file')
 
-## Search functions
+# make sure that there are archive types
+validator.data().has_type_like('archive.*')
 
-These are used to gather property values together so that they can be validated.
+# make sure that there are types of each name
+validator.data().has_types(['archive_file', 'external'])
 
-### Validator.resources([resource_types])
-Searches for all resources of the required types and outputs a `TerraformResourceList`.
+# Make sure there are types with a specific id
+validator.data().has_type_by_id('local_data_source')
+```
 
-Can be chained with a `.property()` function.
+### Types
 
-If passed a string as an argument, search through all resource types and list the ones that match the string as a regex.
-If passed a list as an argument, only use the types that are inside the list.
+Types represent anything that is under the `resources` or `data` sections. When querying a section for a list of types 
+an instance of `TerraformTypeList` is returned. This allows can be used to filter the types and validate them and
+their properties.
 
-Outputs: `TerraformResourceList`
+#### Terraform Type List
 
-### TerraformResourceList.property(property_name)
+### Properties
 
-Collects all top-level properties in a `TerraformResourceList`  and exposes methods that can be used to validate the property values.
-
-Can be chained with another `.property()` call to fetch nested properties.
-
-eg. ``.resource('aws_instance').property('name')``
-
-### TerraformResourceList.find_property(regex)
-
-Similar to `TerraformResourceList.property()`, except that it will attempt to use a regex string to search for the property.
-
-eg. ``.resource('aws_instance').find_property('tag[a-z]')``
-
-
-### TerraformPropertyList.property(property_name)
-
-Collects all nested properties in `TerraformPropertyList` and exposes methods that can be used to validate the property values.
-
-eg. ``.resource('aws_instance').property('tags').property('name')``
-
-
-### TerraformPropertyList.find_property(regex)
-
-Similar to `TerraformPropertyList.property()`, except that it will attempt to use a regex string to search for the property.
-
-eg. ``.resource('aws_instance').find_property('tag[a-z]')``
-
-## Validation functions
-
-If there are any errors, these functions will print the error and raise an AssertionError. The purpose of these functions is to validate the property values of different resources.
-
-### TerraformResourceList.should_have_properties([required_properties])
-
-Will raise an AssertionError if any of the properties in `required_properties` are missing from a `TerraformResourceList`.
-
-### TerraformPropertyList.should_have_properties([required_properties])
-
-Will raise an AssertionError if any of the properties in `required_properties` are missing from a `TerraformPropertyList`.
-
-### TerraformResourceList.should_not_have_properties([excluded_properties])
-
-Will raise an AssertionError if any of the properties in `required_properties` are missing from a `TerraformResourceList`.
-
-### TerraformPropertyList.should_not_have_properties([excluded_properties])
-
-Will raise an AssertionError if any of the properties in `required_properties` are missing from a `TerraformPropertyList`.
-
-### TerraformResourceList.name_should_match_regex(regex)
-
-Will raise an AssertionError if the Terraform resource name does not match the value of `regex`
-
-### TerraformPropertyList.should_equal(expected_value)
-
-Will raise an AssertionError if the value of the property does not equal `expected_value`
-
-### TerraformPropertyList.should_not_equal(unexpected_value)
-
-Will raise an AssertionError if the value of the property equals `unexpected_value`
-
-### TerraformPropertyList.should_match_regex(regex)
-
-Will raise an AssertionError if the value of the property does not match the value of `regex`
-
-### TerraformPropertyList.list_should_contain([value])
-
-Will raise an AssertionError if the list value does not contain any of the `[value]`
-
-### TerraformPropertyList.list_should_not_contain([value])
-
-Will raise an AssertionError if the list value does contain any of the `[value]`
+### Variables
 
