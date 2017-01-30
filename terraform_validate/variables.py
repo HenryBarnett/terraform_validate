@@ -62,7 +62,7 @@ class TerraformVariable:
     def has_default(self):
         self.__find_value_for_type__('default')
 
-    def no_default_value(self):
+    def no_default(self):
         self.__check_no_value_for_type('default')
 
     def default_value_equals(self, expected_value):

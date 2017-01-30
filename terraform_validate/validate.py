@@ -48,8 +48,8 @@ class Validator:
         return TerraformSection(self, 'resource', self.__get_sections__('resource'))
         # return TerraformTypeList(self, type_name, self.__get_sections__('resource'))
 
-    def data(self, type_name):
-        return TerraformTypeList(self, type_name, self.__get_sections__('data'))
+    def data(self):
+        return TerraformSection(self, 'data', self.__get_sections__('data'))
 
     def variables(self):
         return TerraformVariableList(self.__get_sections__('variable'))
@@ -78,11 +78,6 @@ class Validator:
                         terraform_string += new_terraform
         terraform = hcl.loads(terraform_string)
         return terraform
-
-    def get_terraform_resources(self, name, resources):
-        if name not in resources.keys():
-            return []
-        return self.convert_to_list(resources[name])
 
     def substitute_variable_values_in_string(self, s):
         if self.variable_expand:

@@ -118,7 +118,7 @@ class TerraformPropertyList:
         if len(errors) > 0:
             raise AssertionError("\n".join(sorted(errors)))
 
-    def should_have_properties(self, properties_list):
+    def have_properties(self, properties_list):
         errors = []
 
         if type(properties_list) is not list:
@@ -135,7 +135,7 @@ class TerraformPropertyList:
         if len(errors) > 0:
             raise AssertionError("\n".join(sorted(errors)))
 
-    def should_not_have_properties(self, properties_list):
+    def do_not_have_properties(self, properties_list):
         errors = []
 
         if type(properties_list) is not list:
@@ -153,7 +153,7 @@ class TerraformPropertyList:
         if len(errors) > 0:
             raise AssertionError("\n".join(sorted(errors)))
 
-    def find_property(self, regex):
+    def properties_like(self, regex):
         list = TerraformPropertyList(self.validator)
         for property in self.properties:
             for nested_property in property.property_value:
