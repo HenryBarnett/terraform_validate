@@ -60,6 +60,15 @@ class TerraformSection:
 
         return TerraformTypeList(self.validator, type_list, lookup_id)
 
+    def types_by_property(self, property_name):
+        type_list = []
+        for type_name, type_value in self.section.items():
+            for type_id, type_properties in type_value.items():
+                if property_name in type_properties.keys():
+                    type_list.append(TerraformType(type_name, type_id, type_properties))
+
+        return TerraformTypeList(self.validator, type_list, property_name)
+
     def type_id_like(self, id_regex):
         type_list = []
         for type_name, type_value in self.section.items():
@@ -191,6 +200,16 @@ class TerraformTypeList:
                                                    type_value))
 
         return TerraformTypeList(self.validator, new_type_list, "{0}.{1}".format(self.type_name_or_regex, filter_id))
+
+    def filter_by_property(self, property_name):
+        new_type_list = []
+        for type_value in self.type_list:
+            if property_name in type_value.config.keys():
+                new_type_list.append(TerraformType(type_value.type_name,
+                                                   type_value.id,
+                                                   type_value))
+
+        return TerraformTypeList(self.validator, new_type_list, "{0}.{1}".format(self.type_name_or_regex, property_name))
 
     def have_id_like(self, regex):
         errors = []

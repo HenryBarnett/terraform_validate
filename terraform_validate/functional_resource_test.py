@@ -404,3 +404,17 @@ class TestValidatorFunctional(unittest.TestCase):
     def test_all_types(self):
         validator = t.Validator(os.path.join(self.path, "fixtures/all"))
         validator.resources().all_types().is_size(5)
+
+    def test_filter_type_by_property(self):
+        validator = t.Validator(os.path.join(self.path, "fixtures/filter_property"))
+        validator.resources().types_by_property('filtered_property').is_size(3)
+        expected_error = self.error_list_format("Type list 'filtered_property' should have size 2 but has size 3.")
+        with self.assertRaisesRegexp(AssertionError, expected_error):
+            validator.resources().types_by_property('filtered_property').is_size(2)
+
+    def test_filter_type_list_by_property(self):
+        validator = t.Validator(os.path.join(self.path, "fixtures/filter_property"))
+        validator.resources().all_types().filter_by_property('filtered_property').is_size(3)
+        expected_error = self.error_list_format("Type list 'all.filtered_property' should have size 2 but has size 3.")
+        with self.assertRaisesRegexp(AssertionError, expected_error):
+            validator.resources().all_types().filter_by_property('filtered_property').is_size(2)
