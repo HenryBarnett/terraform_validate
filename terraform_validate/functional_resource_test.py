@@ -418,3 +418,17 @@ class TestValidatorFunctional(unittest.TestCase):
         expected_error = self.error_list_format("Type list 'all.filtered_property' should have size 2 but has size 3.")
         with self.assertRaisesRegexp(AssertionError, expected_error):
             validator.resources().all_types().filter_by_property('filtered_property').is_size(2)
+
+    # def test_type_count(self):
+    #     validator = t.Validator(os.path.join(self.path, "fixtures/count"))
+    #     validator.resources().types_by_id()
+    #     expected_error = self.error_list_format("Type list 'all.filtered_property' should have size 2 but has size 3.")
+    #     with self.assertRaisesRegexp(AssertionError, expected_error):
+    #         validator.resources().all_types().filter_by_property('filtered_property').is_size(2)
+
+    def test_evaluate_size(self):
+        validator = t.Validator(os.path.join(self.path, "fixtures/filter_id"))
+        validator.resources().types_by_name('aws_security_group').evaluate_size(lambda size: size < 3)
+        expected_error = self.error_list_format("Type list 'aws_security_group' failed lambda with size 2.")
+        with self.assertRaisesRegexp(AssertionError, expected_error):
+            validator.resources().types_by_name('aws_security_group').evaluate_size(lambda size: size < 2)

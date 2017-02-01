@@ -1,5 +1,6 @@
 from .regex import matches_regex_pattern
 from .properties import TerraformPropertyList, TerraformProperty
+import inspect
 
 
 class TerraformSection:
@@ -229,4 +230,12 @@ class TerraformTypeList:
             raise AssertionError("Type list '{0}' should have size {1} but has size {2}.".format(self.type_name_or_regex,
                                                                                                size,
                                                                                                cur_size))
+        return self
+
+    def evaluate_size(self, eval_op):
+        cur_size = len(self.type_list)
+        if not eval_op(cur_size):
+            raise AssertionError("Type list '{0}' failed lambda with size {2}.".format(self.type_name_or_regex,
+                                                                                                 inspect.getsource(eval_op),
+                                                                                                 cur_size))
         return self
